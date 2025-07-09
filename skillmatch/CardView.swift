@@ -10,27 +10,36 @@ import SwiftUI
 struct CardView: View {
     @State private var offset : CGSize = .zero // CGSize(width: 0, height: 0)の省略形
     //@Stateで動かすことができる
-    let user: User
+    let user: Profile
     let adjustIndex: (Bool) -> Void
+    @StateObject private var viewModel1 = CommentViewModel()
+
 
     var body: some View {
         ZStack(alignment:.bottom) {
             //画像の上にテキスト要素
             //Background
-            Color.black
+            Image("3da6a1c7218c76750a71770c512a0064")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(height: 600)
+                // .frame(width: 400) のような固定サイズではなく、
+                // ZStack全体に広がるように .ignoresSafeArea() などを使うのが一般的
             
-            //image
-            imageLayar
+            // ユーザー画像レイヤー
+            // もしユーザー画像があるなら、これが背景画像の上に重なる
+            //imageLayar
             
-            //Gradient
+            // グラデーション
             LinearGradient(colors: [.clear, .black], startPoint: .center, endPoint: .bottom)
             
-            //Infomation　位置を調整したい時はZStackで
+            // 情報レイヤー
             infomationLayar
-            //Like and Nope
-            LikeAndNope
             
+            // Like と Nope の表示
+            LikeAndNope
         }
+        .frame(width: 400, height: 600)
         .clipShape(RoundedRectangle(cornerRadius: 15))
         .offset(offset) //変数にして後から制御できるようにする
         .gesture(gesture)
@@ -50,12 +59,15 @@ struct CardView: View {
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("LIKEACTION"),object: nil)){
             data in
             print("ListViewModelからの通知を受信しました \(data)")
+            
             guard
                   let info = data.userInfo,
                   let id = info["id"] as? String
                   else { return }
             if id == user.id {
                 removeCard(isLiked: true)
+                
+                        
                }
                     }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("REDOACTION"),object: nil)){
@@ -79,7 +91,7 @@ struct CardView: View {
 // MARK: -UI
 extension CardView {
     private var imageLayar : some View {
-        Image(user.photoUrl ?? "avatar")
+        Image("3da6a1c7218c76750a71770c512a0064")
             .resizable() // 全体に合わせる
             .aspectRatio(contentMode: .fill) // 元々の比
             .frame(width: 400)
@@ -103,21 +115,8 @@ extension CardView {
     private var opacity: Double {
         return offset.width / screenWidth * 4.0
     }
-    private func removeCard(isLiked: Bool, height: CGFloat = 0.0) {
-            withAnimation(.smooth) {
-                offset = CGSize(width: isLiked ? screenWidth * 1.5 : -screenWidth * 1.5, height: height)
-            }
-        adjustIndex(false)
-        }
-    private func resetCard() {
-        withAnimation(.smooth) {
-            offset = .zero
-        }
-        
-        adjustIndex(true)
-        
-    }
-        
+
+
     
     private var infomationLayar : some View {
         VStack(alignment: .leading) {
@@ -130,9 +129,10 @@ extension CardView {
                     .foregroundStyle(.white, .blue) // 中を白、チェックをブルー
                     .font(.title2)
             }
-            if let message = user.message {
-                Text(message)
-            }
+            
+            Text(user.text)
+            Text(user.email)
+            
             
         }
         .foregroundStyle(.white)
@@ -141,43 +141,49 @@ extension CardView {
     }
     
     private var LikeAndNope: some View {
-        HStack {
-            //Like
-            Text("LIKE")
-                .tracking(4)
-                .foregroundStyle(.green)
-                .font(.system(size: 50))
-                .fontWeight(.heavy)
-                .padding(.horizontal,8)
-                .padding(.vertical,2)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(.green, lineWidth: 5)
+        VStack{
+            HStack {
+                //Like
+                Text("LIKE")
+                    .tracking(4)
+                    .foregroundStyle(.green)
+                    .font(.system(size: 50))
+                    .fontWeight(.heavy)
+                    .padding(.horizontal,8)
+                    .padding(.vertical,2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(.green, lineWidth: 5)
                         
-                )
-                .rotationEffect(Angle(degrees: -15))
-                .offset(x: 16, y: 30)
-                .opacity(opacity)
+                    )
+                    .rotationEffect(Angle(degrees: -15))
+                    .offset(x: 16, y: 30)
+                    .opacity(opacity)
+                
+                
+                Spacer()
+                //Nope
+                Text("NOPE")
+                    .tracking(4)
+                    .foregroundStyle(.red)
+                    .font(.system(size: 50))
+                    .fontWeight(.heavy)
+                    .padding(.horizontal,8)
+                    .padding(.vertical,2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(.red, lineWidth: 5)
+                        
+                        
+                    )
+                    .rotationEffect(Angle(degrees: 15))
+                    .offset(x: -16, y: 30)
+                    .opacity(-opacity)
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
             Spacer()
-            //Nope
-            Text("NOPE")
-                .tracking(4)
-                .foregroundStyle(.red)
-                .font(.system(size: 50))
-                .fontWeight(.heavy)
-                .padding(.horizontal,8)
-                .padding(.vertical,2)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(.red, lineWidth: 5)
-                    
-                        
-                )
-                .rotationEffect(Angle(degrees: 15))
-                .offset(x: -16, y: 30)
-                .opacity(-opacity)
         }
-        .frame(maxHeight: .infinity, alignment: .top)
+        
     }
 }
 
@@ -196,13 +202,24 @@ extension CardView {
                 offset = CGSize(width: width, height: limitedHeight )
             }
             .onEnded { value in
-                
                 let width = value.translation.width
                 let height = value.translation.height
-                
+
                 if (abs(width) > (screenWidth / 4)) {
-                    removeCard(isLiked: width > 0, height: height)
-                 
+                    // isLikedを定数にしておくと、より分かりやすくなります
+                    let isLiked = width > 0
+
+                    removeCard(isLiked: isLiked, height: height)
+                    viewModel1.cardkidoku(kidokuuserId: user.id ?? "aaa")
+                    
+                    // ✅ isLiked が true の時（右スワイプの時）だけ、いいね処理を呼び出す
+                    if isLiked {
+                        // user.idがnilでないことを確認し、安全に取り出す
+                        if let userID = user.id {
+                            print("いいねのアクションを実行します")
+                            viewModel1.iinetsuika(userIdUketoru: userID)
+                        }
+                    }
                 } else {
                     resetCard()
                 }
@@ -210,6 +227,27 @@ extension CardView {
         
                 }
             }
+// MARK: -Action
+extension CardView {
+    // ... gestureの定義 ...
     
+    private func removeCard(isLiked: Bool, height: CGFloat = 0.0) {
+        withAnimation(.smooth) {
+            offset = CGSize(width: isLiked ? screenWidth * 1.5 : -screenWidth * 1.5, height: height)
+        }
+        // ✅【重要】カードを消した時にインデックスを進める
+        adjustIndex(false) // isRedo: false を渡す
+    }
+    
+    private func resetCard() {
+        withAnimation(.smooth) {
+            offset = .zero
+        }
+        // ✅ カードが中央に戻るだけなので、インデックスは操作しない
+        // adjustIndex(true) // ← この行をコメントアウトまたは削除
+    }
+
+    // ...
+}
 
 
